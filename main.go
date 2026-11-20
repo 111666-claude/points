@@ -8,7 +8,6 @@
 // This program is probably slow, and fairly suboptimal stemming from
 // the fact that I have absolutely no experience writing graphics
 // utilities.  But hopefully it is easy to read and understand.
-//
 package main
 
 import (
@@ -37,6 +36,14 @@ var (
 	color         = flag.Bool("c", true, "Use average color for area rather than just black")
 	bt701         = flag.Bool("l", false, "Use BT.701 instead of BT.601 for luma calculations")
 	lumaArea      = flag.Bool("a", false, "Use the luma as the surface area instead of the radius")
+
+	cmykMode  = flag.Bool("cmyk", false, "CMYK halftone mode: separate into C, M, Y, K screened layers")
+	dpi       = flag.Int("dpi", 300, "CMYK mode: output resolution in dots per inch")
+	lpi       = flag.Int("lpi", 60, "CMYK mode: screen ruling in lines per inch")
+	angles    = flag.String("angles", "15,75,0,45", "CMYK mode: screen angles in degrees for C,M,Y,K")
+	separate  = flag.Bool("separate", false, "CMYK mode: write one SVG per channel instead of a composite preview")
+	maxPixels = flag.Int64("maxpixels", defaultMaxPixels, "CMYK mode: refuse images with more pixels than this")
+	maxCells  = flag.Int64("maxcells", defaultMaxCells, "CMYK mode: refuse screens with more cells per channel than this")
 )
 
 // readImage reads the source image. What formats it can understand
@@ -180,6 +187,37 @@ func main() {
 	if *outputFile == "" {
 		fn := strings.TrimSuffix(*inputFile, filepath.Ext(*inputFile)) + ".svg"
 		outputFile = &fn
+	}
+
+	if *cmykMode {
+		parsedAngles, err := parseAngles(*angles)
+		if err != nil {
+			log.Fatalf("Invalid angles: %v", err)
+		}
+		params := halftoneParams{
+			DPI:       *dpi,
+			LPI:       *lpi,
+			Angles:    parsedAngles,
+			Scale:     *scale,
+			MaxPixels: *maxPixels,
+			MaxCells:  *maxCells,
+		}
+		dots, err := computeDots(img, params)
+		if err != nil {
+			log.Fatalf("Halftone error: %v", err)
+		}
+		if *separate {
+			names, err := writeSeparationsSVG(*outputFile, img, params, dots)
+			if err != nil {
+				log.Fatalf("Error writing separations: %v", err)
+			}
+			log.Printf("Wrote separations: %s", strings.Join(names, ", "))
+		} else {
+			if err := writeCompositeSVG(*outputFile, img, params, dots); err != nil {
+				log.Fatalf("Error writing composite: %v", err)
+			}
+		}
+		return
 	}
 
 	makeDots(img, *boxSize, *lumaThreshold, *color, *bt701, *outputFile, *scale, *lumaArea)

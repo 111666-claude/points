@@ -36,6 +36,39 @@ To install
   - **`-c`** : use average color for area rather than just black (default true)
   - **`-a`** : use the luma as the surface area instead of the radius (default false)
 
+## CMYK halftone mode
+
+With `-cmyk` the input is separated into C, M, Y and K channels and
+each channel is screened with its own angle and line frequency, the
+way color print avoids moiré by not aligning the screens:
+
+  - **`-cmyk`** : enable CMYK halftone mode
+  - **`-dpi <int>`** : output resolution in dots per inch (default 300)
+  - **`-lpi <int>`** : screen ruling in lines per inch (default 60);
+    the screen cell is `dpi/lpi` pixels
+  - **`-angles <c,m,y,k>`** : screen angles in degrees (default
+    `15,75,0,45`)
+  - **`-separate`** : write one SVG per channel (`<name>_C.svg`,
+    `<name>_M.svg`, `<name>_Y.svg`, `<name>_K.svg`) instead of a
+    single composite preview
+  - **`-maxpixels <int>`** : refuse images larger than this many
+    pixels (default 100000000)
+  - **`-maxcells <int>`** : refuse screens with more cells per
+    channel than this (default 8000000)
+
+Example
+
+    ./points -f poster.jpg -cmyk -dpi 300 -lpi 60 -angles 15,75,0,45 -o poster.svg
+    ./points -f poster.jpg -cmyk -separate -o poster.svg
+
+The composite preview blends the four layers with
+`mix-blend-mode:multiply` over a white background so overlapping inks
+darken like print.  Transparent pixels in the input are composited
+over white, i.e. they produce no dots.  Dot area within each screen
+cell equals the channel coverage of that cell, and output is
+deterministic for fixed parameters.
+
+
 Example usages
 
     ./points -f test.jpg -o mytest.svg -b 50 -t 0.6 
